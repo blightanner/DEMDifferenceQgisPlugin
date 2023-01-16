@@ -1,0 +1,5 @@
+<RCC>
+    <qresource prefix="/plugins/raster_volume_compare" >
+        <file>icon.png</file>
+    </qresource>
+</RCC>

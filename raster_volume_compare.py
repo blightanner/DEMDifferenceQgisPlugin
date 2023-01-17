@@ -21,10 +21,10 @@
  *                                                                         *
  ***************************************************************************/
 """
-from qgis.PyQt.QtCore import QSettings, QTranslator, QCoreApplication
+from qgis.PyQt.QtCore import QSettings, QTranslator, QCoreApplication, QVariant
 from qgis.PyQt.QtGui import QIcon
 from qgis.PyQt.QtWidgets import QAction
-from qgis.core import QgsProject, Qgis, QgsRasterLayer, QgsMessageLog, QgsTaskManager, QgsProcessingAlgRunnerTask, QgsProcessingContext, QgsProcessingFeedback, QgsApplication
+from qgis.core import QgsProject, Qgis, QgsRasterLayer, QgsMessageLog, QgsTaskManager, QgsProcessingAlgRunnerTask, QgsProcessingContext, QgsProcessingFeedback, QgsApplication,QgsField, QgsExpression, QgsExpressionContext, QgsExpressionContextUtils
 from qgis.analysis import QgsRasterCalculator, QgsRasterCalculatorEntry
 from PyQt5.QtWidgets import QFileDialog
 from qgis.utils import iface
@@ -206,9 +206,23 @@ class RasterVolumeCompare:
         
         else:        
             todayDateString = datetime.today().strftime('%Y-%m-%d')
-            currentDir = os.getcwd()
-            statsFilePath = currentDir + '\\Statistics\\zonalStats' + todayDateString + '.gpkg'
-            anotherLayer = iface.addVectorLayer(results["OUTPUT_TABLE"], statsFilePath, "ogr")
+            layerHandle = iface.addVectorLayer(results["OUTPUT_TABLE"], 'zonalStats' + todayDateString, "ogr")
+            layerHandle.startEditing()
+            pv = layerHandle.dataProvider()
+            pv.addAttributes([QgsField('Volume', QVariant.Double)])
+            layerHandle.updateFields()
+            
+            calculatorExpression = QgsExpression('"zone" * "m2"')
+            
+            calculatorContext = QgsExpressionContext()
+            calculatorContext.appendScopes(QgsExpressionContextUtils.globalProjectLayerScopes(layerHandle))
+            
+            for f in layerHandle.getFeatures():
+                calculatorContext.setFeature(f)
+                f['Volume'] = calculatorExpression.evaluate(calculatorContext)
+                layerHandle.updateFeature(f)
+            
+            layerHandle.commitChanges()
 
     def run(self):
         """Run method that performs all the real work"""

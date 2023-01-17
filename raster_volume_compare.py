@@ -273,20 +273,22 @@ class RasterVolumeCompare:
             newFilename = self.dlg.lineEdit.text()
             
             # Get the first selected layer
-            selectedLayerIndex1 = self.dlg.comboBox.currentIndex()  
-            selectedLayer1 = layers[selectedLayerIndex1].layer()  
+            layer1Nametest = self.dlg.comboBox.currentText()
+            QgsMessageLog.logMessage('Layer 1 name is ' + layer1Nametest, 'my-plugin', Qgis.Info)
+            selectedLayer1 = QgsProject.instance().mapLayersByName(layer1Nametest)
                 
             # Get the second selected layer
-            selectedLayerIndex2 = self.dlg.comboBox_2.currentIndex()  
-            selectedLayer2 = layers[selectedLayerIndex2].layer()  
+            selectedLayer2Name = self.dlg.comboBox_2.currentText()  
+            selectedLayer2 = QgsProject.instance().mapLayersByName(selectedLayer2Name) 
             
             #set up layer references
             layer1Ref=QgsRasterCalculatorEntry()
-            layer1Ref.raster=selectedLayer1
+            #should check here for empty or null list...
+            layer1Ref.raster=selectedLayer1[0]
             layer1Ref.bandNumber = 1
             layer1Ref.ref = "selectedLayer1@1"
             layer2Ref=QgsRasterCalculatorEntry()
-            layer2Ref.raster=selectedLayer2
+            layer2Ref.raster=selectedLayer2[0]
             layer2Ref.bandNumber = 1
             layer2Ref.ref = "selectedLayer2@1"
             
@@ -294,7 +296,7 @@ class RasterVolumeCompare:
             entries.append(layer1Ref)
             entries.append(layer2Ref)
             calculationString = layer1Ref.ref + ' - ' +layer2Ref.ref
-            differenceRaster = QgsRasterCalculator(calculationString, newFilename, "GTiff", selectedLayer2.extent(), selectedLayer2.width(), selectedLayer2.height(), entries)
+            differenceRaster = QgsRasterCalculator(calculationString, newFilename, "GTiff", selectedLayer2[0].extent(), selectedLayer2[0].width(), selectedLayer2[0].height(), entries)
             differenceRaster.processCalculation()
             
             todayDateString = datetime.today().strftime('%Y-%m-%d')
@@ -304,7 +306,7 @@ class RasterVolumeCompare:
             QgsMessageLog.logMessage('Current working directy is ' + currentDir, 'my-plugin', Qgis.Info)
             
             userSpecifiedStylePath = self.dlg.lineEdit_2.text()
-            templateStylePath = currentDir + '\\Styles\\SandElevationChange.qml'
+            templateStylePath = currentDir + '\\3 Styles\\SandElevationChange.qml'
             stylePath = ""
             if userSpecifiedStylePath:
                 stylePath = userSpecifiedStylePath

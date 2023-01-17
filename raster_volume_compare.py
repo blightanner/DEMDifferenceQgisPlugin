@@ -194,9 +194,17 @@ class RasterVolumeCompare:
             self.iface.removeToolBarIcon(action)
 
     def select_output_file(self):  
+        
+        todayDateString = datetime.today().strftime('%Y-%m-%d-%H-%M-%S')
+        niceFileName = 'DifferenceRaster' + todayDateString
         filename, _filter = QFileDialog.getSaveFileName(  
-            self.dlg, "Select output filename and destination","layer_info", 'GeoTIFF(*.tif)')  
+            self.dlg, "Select output filename and destination",niceFileName, 'GeoTIFF(*.tif)')  
         self.dlg.lineEdit.setText(filename)  
+        
+    def select_style_file(self):  
+        filename, _filter = QFileDialog.getSaveFileName(  
+            self.dlg, "Select output filename and destination","layer_info", 'QML(*.qml)')  
+        self.dlg.lineEdit_2.setText(filename)  
         
     def OnZonalStatsComplete(self, context, successful, results):
         if not successful:
@@ -233,6 +241,7 @@ class RasterVolumeCompare:
             self.first_start = False
             self.dlg = RasterVolumeCompareDialog()
             self.dlg.toolButton.clicked.connect(self.select_output_file)  
+            self.dlg.toolButton_2.clicked.connect(self.select_style_file)  
 
          # Fetch the currently loaded layers  
         layers = QgsProject.instance().layerTreeRoot().children()
@@ -293,9 +302,22 @@ class RasterVolumeCompare:
 
             currentDir = os.getcwd()
             QgsMessageLog.logMessage('Current working directy is ' + currentDir, 'my-plugin', Qgis.Info)
-            stylePath = currentDir + '\\Styles\\SandElevationChange.qml'
-            rLayerDifference.loadNamedStyle(stylePath)
-            rLayerDifference.triggerRepaint()
+            
+            userSpecifiedStylePath = self.dlg.lineEdit_2.text()
+            templateStylePath = currentDir + '\\Styles\\SandElevationChange.qml'
+            stylePath = ""
+            if userSpecifiedStylePath:
+                stylePath = userSpecifiedStylePath
+            elif os.path.isfile(templateStylePath):
+                stylePath = templateStylePath
+            else:
+                stylePath = ""
+            
+            #stylePath = currentDir + '\\Styles\\SandElevationChange.qml'
+            
+            if stylePath:
+                rLayerDifference.loadNamedStyle(stylePath)
+                rLayerDifference.triggerRepaint()
             
             statsFilePath = currentDir + '\\Statistics\\zonalStats' + todayDateString + '.gpkg'
             #processing.run("native:rasterlayerzonalstats", {'INPUT': rLayerDifference.source(), 'BAND': 1, 'ZONES_BAND': 1, 'ZONES': rLayerDifference,'OUTPUT_TABLE': statsFilePath})

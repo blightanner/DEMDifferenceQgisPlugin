@@ -42,6 +42,8 @@ from functools import partial
 
 
 class RasterVolumeCompare:
+    context = QgsProcessingContext()
+    feedback = QgsProcessingFeedback()
     """QGIS Plugin Implementation."""
 
     def __init__(self, iface):
@@ -75,6 +77,9 @@ class RasterVolumeCompare:
         # Check if plugin was started the first time in current QGIS session
         # Must be set in initGui() to survive plugin reloads
         self.first_start = None
+        
+        self.context = QgsProcessingContext()
+        self.feedback = QgsProcessingFeedback()
 
     # noinspection PyMethodMayBeStatic
     def tr(self, message):
@@ -195,9 +200,15 @@ class RasterVolumeCompare:
         
     def OnZonalStatsComplete(self, context, successful, results):
         if not successful:
-            QgsMessageLog.logMessage('Task finished unsucessfully',
+            QgsMessageLog.logMessage('Zonal Stats task finished unsucessfully with description ',
                                      'my-plugin', Qgis.Warning)
-        anotherLayer = iface.addVectorLayer(results["OUTPUT_TABLE"], "layer_name_you_like", "ogr")
+        
+        
+        else:        
+            todayDateString = datetime.today().strftime('%Y-%m-%d')
+            currentDir = os.getcwd()
+            statsFilePath = currentDir + '\\Statistics\\zonalStats' + todayDateString + '.gpkg'
+            anotherLayer = iface.addVectorLayer(results["OUTPUT_TABLE"], statsFilePath, "ogr")
 
     def run(self):
         """Run method that performs all the real work"""
@@ -273,22 +284,17 @@ class RasterVolumeCompare:
             rLayerDifference.triggerRepaint()
             
             statsFilePath = currentDir + '\\Statistics\\zonalStats' + todayDateString + '.gpkg'
-            processing.run("native:rasterlayerzonalstats", {'INPUT': rLayerDifference.source(), 'BAND': 1, 'ZONES_BAND': 1, 'ZONES': rLayerDifference,'OUTPUT_TABLE': statsFilePath})
+            #processing.run("native:rasterlayerzonalstats", {'INPUT': rLayerDifference.source(), 'BAND': 1, 'ZONES_BAND': 1, 'ZONES': rLayerDifference,'OUTPUT_TABLE': statsFilePath})
             #statsLayer = iface.addRasterLayer(statsFilePath, "Statistics" + todayDateString)
             
             
             # task stuff
             alg = QgsApplication.processingRegistry().algorithmById(
                                       'native:rasterlayerzonalstats')
-            context = QgsProcessingContext()
-            feedback = QgsProcessingFeedback()
-            params = {'INPUT': rLayerDifference.source(), 'BAND': 1, 'ZONES_BAND': 1, 'ZONES': rLayerDifference,'OUTPUT_TABLE': statsFilePath}
-            task = QgsProcessingAlgRunnerTask(alg, params, context, feedback)
-            task.executed.connect(partial(self.OnZonalStatsComplete, context))
+            
+            params = {'INPUT': rLayerDifference.source(), 'BAND': 1, 'ZONES_BAND': 1, 'ZONES': rLayerDifference.source(),'OUTPUT_TABLE': statsFilePath}
+            task = QgsProcessingAlgRunnerTask(alg, params, self.context, self.feedback)
+            task.executed.connect(partial(self.OnZonalStatsComplete, self.context))
             QgsApplication.taskManager().addTask(task)
             
-             # Generate a message after running the plugin
-            self.iface.messageBar().pushMessage(  
-                "Success", "see log for details",  
-                level=Qgis.Success, duration=3)
             

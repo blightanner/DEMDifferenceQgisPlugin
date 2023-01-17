@@ -244,19 +244,24 @@ class RasterVolumeCompare:
             self.dlg.toolButton_2.clicked.connect(self.select_style_file)  
 
          # Fetch the currently loaded layers  
-        layers = QgsProject.instance().layerTreeRoot().children()
+        layers = QgsProject.instance().mapLayers()
+        
+        layers_names = []
+        for layer in QgsProject.instance().mapLayers().values():
+            layers_names.append(layer.name())
+            QgsMessageLog.logMessage('Layer name is ' + layer.name(), 'my-plugin', Qgis.Info)
 
         # Clear the contents of the comboBox from previous runs  
         self.dlg.comboBox.clear()
 
         # Populate the comboBox with names of all the loaded layers  
-        self.dlg.comboBox.addItems([layer.name() for layer in layers])
+        self.dlg.comboBox.addItems(layers_names)
         
         # Clear the contents of the comboBox from previous runs  
         self.dlg.comboBox_2.clear()
 
         # Populate the comboBox with names of all the loaded layers  
-        self.dlg.comboBox_2.addItems([layer.name() for layer in layers])
+        self.dlg.comboBox_2.addItems(layers_names)
         
     
         # Show the dialog  
@@ -321,7 +326,7 @@ class RasterVolumeCompare:
                 rLayerDifference.loadNamedStyle(stylePath)
                 rLayerDifference.triggerRepaint()
             
-            statsFilePath = currentDir + '\\Statistics\\zonalStats' + todayDateString + '.gpkg'
+            statsFilePath = currentDir + '\\5 Working Files\\zonalStats' + todayDateString + '.gpkg'
             #processing.run("native:rasterlayerzonalstats", {'INPUT': rLayerDifference.source(), 'BAND': 1, 'ZONES_BAND': 1, 'ZONES': rLayerDifference,'OUTPUT_TABLE': statsFilePath})
             #statsLayer = iface.addRasterLayer(statsFilePath, "Statistics" + todayDateString)
             

@@ -24,10 +24,11 @@
 from qgis.PyQt.QtCore import QSettings, QTranslator, QCoreApplication
 from qgis.PyQt.QtGui import QIcon
 from qgis.PyQt.QtWidgets import QAction
-from qgis.core import QgsProject, Qgis, QgsRasterLayer, QgsMessageLog
+from qgis.core import QgsProject, Qgis, QgsRasterLayer, QgsMessageLog, QgsTaskManager, QgsProcessingAlgRunnerTask, QgsProcessingContext, QgsProcessingFeedback, QgsApplication
 from qgis.analysis import QgsRasterCalculator, QgsRasterCalculatorEntry
 from PyQt5.QtWidgets import QFileDialog
 from qgis.utils import iface
+from qgis import processing
 
 # Initialize Qt resources from file resources.py
 from .resources import *
@@ -35,6 +36,9 @@ from .resources import *
 from .raster_volume_compare_dialog import RasterVolumeCompareDialog
 import os.path
 import logging
+import os
+from datetime import datetime
+from functools import partial
 
 
 class RasterVolumeCompare:
@@ -188,6 +192,12 @@ class RasterVolumeCompare:
         filename, _filter = QFileDialog.getSaveFileName(  
             self.dlg, "Select output filename and destination","layer_info", 'GeoTIFF(*.tif)')  
         self.dlg.lineEdit.setText(filename)  
+        
+    def OnZonalStatsComplete(self, context, successful, results):
+        if not successful:
+            QgsMessageLog.logMessage('Task finished unsucessfully',
+                                     'my-plugin', Qgis.Warning)
+        anotherLayer = iface.addVectorLayer(results["OUTPUT_TABLE"], "layer_name_you_like", "ogr")
 
     def run(self):
         """Run method that performs all the real work"""
@@ -252,11 +262,30 @@ class RasterVolumeCompare:
             calculationString = layer1Ref.ref + ' - ' +layer2Ref.ref
             differenceRaster = QgsRasterCalculator(calculationString, newFilename, "GTiff", selectedLayer2.extent(), selectedLayer2.width(), selectedLayer2.height(), entries)
             differenceRaster.processCalculation()
-            rLayerDifference = QgsRasterLayer(newFilename, "DifferenceRaster")
-            rLayerDifference = iface.addRasterLayer(newFilename, "DifferenceRaster")
+            
+            todayDateString = datetime.today().strftime('%Y-%m-%d')
+            rLayerDifference = iface.addRasterLayer(newFilename, "DifferenceRaster" + todayDateString)
 
-            rLayerDifference.loadNamedStyle("C:\\Users\\Laureny\\source\\AutomateQgisExperiment\\Styles\\SandElevationChange.qml")
+            currentDir = os.getcwd()
+            QgsMessageLog.logMessage('Current working directy is ' + currentDir, 'my-plugin', Qgis.Info)
+            stylePath = currentDir + '\\Styles\\SandElevationChange.qml'
+            rLayerDifference.loadNamedStyle(stylePath)
             rLayerDifference.triggerRepaint()
+            
+            statsFilePath = currentDir + '\\Statistics\\zonalStats' + todayDateString + '.gpkg'
+            processing.run("native:rasterlayerzonalstats", {'INPUT': rLayerDifference.source(), 'BAND': 1, 'ZONES_BAND': 1, 'ZONES': rLayerDifference,'OUTPUT_TABLE': statsFilePath})
+            #statsLayer = iface.addRasterLayer(statsFilePath, "Statistics" + todayDateString)
+            
+            
+            # task stuff
+            alg = QgsApplication.processingRegistry().algorithmById(
+                                      'native:rasterlayerzonalstats')
+            context = QgsProcessingContext()
+            feedback = QgsProcessingFeedback()
+            params = {'INPUT': rLayerDifference.source(), 'BAND': 1, 'ZONES_BAND': 1, 'ZONES': rLayerDifference,'OUTPUT_TABLE': statsFilePath}
+            task = QgsProcessingAlgRunnerTask(alg, params, context, feedback)
+            task.executed.connect(partial(self.OnZonalStatsComplete, context))
+            QgsApplication.taskManager().addTask(task)
             
              # Generate a message after running the plugin
             self.iface.messageBar().pushMessage(  

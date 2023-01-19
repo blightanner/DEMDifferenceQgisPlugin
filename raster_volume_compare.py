@@ -21,10 +21,10 @@
  *                                                                         *
  ***************************************************************************/
 """
-from qgis.PyQt.QtCore import QSettings, QTranslator, QCoreApplication, QVariant
+from qgis.PyQt.QtCore import QSettings, QTranslator, QCoreApplication, QVariant, pyqtSignal
 from qgis.PyQt.QtGui import QIcon
 from qgis.PyQt.QtWidgets import QAction
-from qgis.core import QgsProject, Qgis, QgsRasterLayer, QgsMessageLog, QgsTaskManager, QgsProcessingAlgRunnerTask, QgsProcessingContext, QgsProcessingFeedback, QgsApplication,QgsField, QgsExpression, QgsExpressionContext, QgsExpressionContextUtils
+from qgis.core import QgsProject, Qgis, QgsRasterLayer, QgsMessageLog, QgsTaskManager, QgsProcessingAlgRunnerTask, QgsProcessingContext, QgsProcessingFeedback, QgsApplication,QgsField, QgsExpression, QgsExpressionContext, QgsExpressionContextUtils, QgsTask, QgsVectorLayer
 from qgis.analysis import QgsRasterCalculator, QgsRasterCalculatorEntry
 from PyQt5.QtWidgets import QFileDialog
 from qgis.utils import iface
@@ -80,6 +80,8 @@ class RasterVolumeCompare:
         
         self.context = QgsProcessingContext()
         self.feedback = QgsProcessingFeedback()
+        self.task_manager = QgsApplication.taskManager()
+        #self.task_manager.allTasksFinished.connect(self.OnVolumeCalculationComplete)
 
     # noinspection PyMethodMayBeStatic
     def tr(self, message):
@@ -204,8 +206,39 @@ class RasterVolumeCompare:
     def select_style_file(self):  
         filename, _filter = QFileDialog.getSaveFileName(  
             self.dlg, "Select output filename and destination","layer_info", 'QML(*.qml)')  
-        self.dlg.lineEdit_2.setText(filename)  
+        self.dlg.lineEdit_2.setText(filename) 
+
+
         
+    def PerformVolumeCalculation(self, statsLayer):
+    
+        QgsMessageLog.logMessage('Working on updating volume' + currentDir, 'my-plugin', Qgis.Info)
+        statsLayer.startEditing()
+        pv = statsLayer.dataProvider()
+        pv.addAttributes([QgsField('Volume', QVariant.Double)])
+        statsLayer.updateFields()
+        
+        calculatorExpression = QgsExpression('"zone" * "m2"')
+        
+        calculatorContext = QgsExpressionContext()
+        calculatorContext.appendScopes(QgsExpressionContextUtils.globalProjectLayerScopes(statsLayer))
+        
+        for f in statsLayer.getFeatures():
+            calculatorContext.setFeature(f)
+            f['Volume'] = calculatorExpression.evaluate(calculatorContext)
+            statsLayer.updateFeature(f)
+        
+        statsLayer.commitChanges()
+        return true
+        
+    def OnVolumeCalculationComplete(self, result):
+        #update the gui when the volume calculation is complete.
+        QgsMessageLog.logMessage('Completed updating attributes table' + currentDir, 'my-plugin', Qgis.Info)
+        if not result:
+            self.iface.messageBar().pushMessage("Error", "Could not calculate volume", level=Qgis.Warning, duration=3)
+        else:
+            self.iface.messageBar().pushMessage("Info", "Volume calculation complete", level=Qgis.Info, duration=3)
+    
     def OnZonalStatsComplete(self, context, successful, results):
         if not successful:
             QgsMessageLog.logMessage('Zonal Stats task finished unsucessfully with description ',
@@ -214,7 +247,21 @@ class RasterVolumeCompare:
         
         else:        
             todayDateString = datetime.today().strftime('%Y-%m-%d')
-            layerHandle = iface.addVectorLayer(results["OUTPUT_TABLE"], 'zonalStats' + todayDateString, "ogr")
+            
+            
+            # update the attributes table
+            '''
+            globals()['volumeTask'] = QgsTask.fromFunction('Calculate Volume', self.PerformVolumeCalculation, statsLayer=layerHandle, on_finished=self.OnVolumeCalculationComplete)
+            taskid = QgsApplication.taskManager().addTask(globals()['volumeTask'])'''
+            
+            self.testTask = EditGpkgTask(results["OUTPUT_TABLE"], self.iface, todayDateString)
+            QgsApplication.taskManager().addTask(self.testTask)
+            
+            taskStatus = self.testTask.status()
+            QgsMessageLog.logMessage('Task status is ' + str(taskStatus), 'my-plugin', Qgis.Info)
+            
+            # version blocking ui
+            '''
             layerHandle.startEditing()
             pv = layerHandle.dataProvider()
             pv.addAttributes([QgsField('Volume', QVariant.Double)])
@@ -231,6 +278,8 @@ class RasterVolumeCompare:
                 layerHandle.updateFeature(f)
             
             layerHandle.commitChanges()
+            #end blocking ui
+            '''
 
     def run(self):
         """Run method that performs all the real work"""
@@ -249,7 +298,6 @@ class RasterVolumeCompare:
         layers_names = []
         for layer in QgsProject.instance().mapLayers().values():
             layers_names.append(layer.name())
-            QgsMessageLog.logMessage('Layer name is ' + layer.name(), 'my-plugin', Qgis.Info)
 
         # Clear the contents of the comboBox from previous runs  
         self.dlg.comboBox.clear()
@@ -326,7 +374,15 @@ class RasterVolumeCompare:
                 rLayerDifference.loadNamedStyle(stylePath)
                 rLayerDifference.triggerRepaint()
             
-            statsFilePath = currentDir + '\\5 Working Files\\zonalStats' + todayDateString + '.gpkg'
+            statsFolder = currentDir + '\\5 Working Files'
+            
+            # check for existence of designated working files folder
+            if os.path.isdir(statsFolder):
+                statsFilePath = currentDir + '\\5 Working Files\\zonalStats' + todayDateString + '.gpkg'
+            else:
+                statsFilePath = todayDateString + '.gpkg'
+            
+            
             #processing.run("native:rasterlayerzonalstats", {'INPUT': rLayerDifference.source(), 'BAND': 1, 'ZONES_BAND': 1, 'ZONES': rLayerDifference,'OUTPUT_TABLE': statsFilePath})
             #statsLayer = iface.addRasterLayer(statsFilePath, "Statistics" + todayDateString)
             
@@ -340,4 +396,53 @@ class RasterVolumeCompare:
             task.executed.connect(partial(self.OnZonalStatsComplete, self.context))
             QgsApplication.taskManager().addTask(task)
             
+class EditGpkgTask(QgsTask):
+
+    importComplete = pyqtSignal()
+    errorOccurred = pyqtSignal()
+
+    def __init__(self, gpkgPath, iface, datestring):
+        QgsTask.__init__(self, "Update attributes table")
+        self.gpkg = gpkgPath
+        self.iface = iface
+        self.datestring = datestring
+
+    def run(self):
+        QgsMessageLog.logMessage('Starting test task')
+        
+        QgsMessageLog.logMessage('Working on updating volume', 'my-plugin', Qgis.Info)
+        statsLayer = QgsVectorLayer(self.gpkg, 'zonalStats' + self.datestring, "ogr")
+        
+        if not statsLayer.isValid():
+            QgsMessageLog.logMessage('Unable to load gpkg statistics file', 'my-plugin', Qgis.Info)
+            return False
+        
+        statsLayer.startEditing()
+        pv = statsLayer.dataProvider()
+        pv.addAttributes([QgsField('Volume', QVariant.Double)])
+        statsLayer.updateFields()
+        
+        calculatorExpression = QgsExpression('"zone" * "m2"')
+        
+        calculatorContext = QgsExpressionContext()
+        calculatorContext.appendScopes(QgsExpressionContextUtils.globalProjectLayerScopes(statsLayer))
+        
+        for f in statsLayer.getFeatures():
+            calculatorContext.setFeature(f)
+            f['Volume'] = calculatorExpression.evaluate(calculatorContext)
+            statsLayer.updateFeature(f)
+        
+        statsLayer.commitChanges()
+
+        return True
+
+    def finished(self, result):
+        QgsMessageLog.logMessage('In finished(), emit signal')
+        if result:
+            QgsMessageLog.logMessage('In with no error')
+            self.iface.addVectorLayer(self.gpkg, 'zonalStats' + self.datestring, "ogr")
+            self.importComplete.emit()
+        else:
+            QgsMessageLog.logMessage('Error excuting volume calculation task!')
+            self.errorOccurred.emit()        
             

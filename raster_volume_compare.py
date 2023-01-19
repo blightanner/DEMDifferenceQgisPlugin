@@ -81,7 +81,6 @@ class RasterVolumeCompare:
         self.context = QgsProcessingContext()
         self.feedback = QgsProcessingFeedback()
         self.task_manager = QgsApplication.taskManager()
-        #self.task_manager.allTasksFinished.connect(self.OnVolumeCalculationComplete)
 
     # noinspection PyMethodMayBeStatic
     def tr(self, message):
@@ -207,37 +206,6 @@ class RasterVolumeCompare:
         filename, _filter = QFileDialog.getSaveFileName(  
             self.dlg, "Select output filename and destination","layer_info", 'QML(*.qml)')  
         self.dlg.lineEdit_2.setText(filename) 
-
-
-        
-    def PerformVolumeCalculation(self, statsLayer):
-    
-        QgsMessageLog.logMessage('Working on updating volume' + currentDir, 'my-plugin', Qgis.Info)
-        statsLayer.startEditing()
-        pv = statsLayer.dataProvider()
-        pv.addAttributes([QgsField('Volume', QVariant.Double)])
-        statsLayer.updateFields()
-        
-        calculatorExpression = QgsExpression('"zone" * "m2"')
-        
-        calculatorContext = QgsExpressionContext()
-        calculatorContext.appendScopes(QgsExpressionContextUtils.globalProjectLayerScopes(statsLayer))
-        
-        for f in statsLayer.getFeatures():
-            calculatorContext.setFeature(f)
-            f['Volume'] = calculatorExpression.evaluate(calculatorContext)
-            statsLayer.updateFeature(f)
-        
-        statsLayer.commitChanges()
-        return true
-        
-    def OnVolumeCalculationComplete(self, result):
-        #update the gui when the volume calculation is complete.
-        QgsMessageLog.logMessage('Completed updating attributes table' + currentDir, 'my-plugin', Qgis.Info)
-        if not result:
-            self.iface.messageBar().pushMessage("Error", "Could not calculate volume", level=Qgis.Warning, duration=3)
-        else:
-            self.iface.messageBar().pushMessage("Info", "Volume calculation complete", level=Qgis.Info, duration=3)
     
     def OnZonalStatsComplete(self, context, successful, results):
         if not successful:
@@ -250,10 +218,6 @@ class RasterVolumeCompare:
             
             
             # update the attributes table
-            '''
-            globals()['volumeTask'] = QgsTask.fromFunction('Calculate Volume', self.PerformVolumeCalculation, statsLayer=layerHandle, on_finished=self.OnVolumeCalculationComplete)
-            taskid = QgsApplication.taskManager().addTask(globals()['volumeTask'])'''
-            
             self.testTask = EditGpkgTask(results["OUTPUT_TABLE"], self.iface, todayDateString)
             QgsApplication.taskManager().addTask(self.testTask)
             
@@ -368,8 +332,6 @@ class RasterVolumeCompare:
             else:
                 stylePath = ""
             
-            #stylePath = currentDir + '\\Styles\\SandElevationChange.qml'
-            
             if stylePath:
                 rLayerDifference.loadNamedStyle(stylePath)
                 rLayerDifference.triggerRepaint()
@@ -381,11 +343,6 @@ class RasterVolumeCompare:
                 statsFilePath = currentDir + '\\5 Working Files\\zonalStats' + todayDateString + '.gpkg'
             else:
                 statsFilePath = todayDateString + '.gpkg'
-            
-            
-            #processing.run("native:rasterlayerzonalstats", {'INPUT': rLayerDifference.source(), 'BAND': 1, 'ZONES_BAND': 1, 'ZONES': rLayerDifference,'OUTPUT_TABLE': statsFilePath})
-            #statsLayer = iface.addRasterLayer(statsFilePath, "Statistics" + todayDateString)
-            
             
             # task stuff
             alg = QgsApplication.processingRegistry().algorithmById(
@@ -441,8 +398,10 @@ class EditGpkgTask(QgsTask):
         if result:
             QgsMessageLog.logMessage('In with no error')
             self.iface.addVectorLayer(self.gpkg, 'zonalStats' + self.datestring, "ogr")
+            self.iface.messageBar().createMessage("Info", "Finished calculating volume difference")
             self.importComplete.emit()
         else:
             QgsMessageLog.logMessage('Error excuting volume calculation task!')
+            self.iface.messageBar().createMessage("Error", "Unable to calculate volume difference")
             self.errorOccurred.emit()        
             

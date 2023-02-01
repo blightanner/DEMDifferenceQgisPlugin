@@ -7,7 +7,7 @@ name=Raster Volume Comparison
 qgisMinimumVersion=3.0
 description=Calculates the difference in volume between two raster layers
 version=0.1
-author=L Yang/Bligh Tanner
+author=Lauren Yang at Bligh Tanner Pty Ltd
 email=lauren.yang@blightanner.com.au
 
 about=Calculates the volume difference between two raster layers with elevation data. If the layers are different sizes, the larger will be clipped to the smaller. Units of the raster/DEM must match project units (eg, m, m^2, m^3).  To view the volume difference between raster surfaces, open the statistical summary pane (View->Statistical Summary), select the generated statistical summary layer (zonalStats<*>) and select the "Volume" field.  The difference in volume is the calculated "Sum" statistic.  A negative number implies erosion/loss, a positive number implies accretion/gain. 
@@ -25,7 +25,7 @@ hasProcessingProvider=no
 # Tags are comma separated with spaces allowed
 tags=python, raster/DEM, volume, erosion/loss, accretion/gain
 
-homepage=http://homepage
+homepage=https://github.com/blightanner/DEMDifferenceQgisPlugin
 category=Plugins
 icon=icon.png
 # experimental flag

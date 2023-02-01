@@ -223,27 +223,6 @@ class RasterVolumeCompare:
             
             taskStatus = self.testTask.status()
             QgsMessageLog.logMessage('Task status is ' + str(taskStatus), 'my-plugin', Qgis.Info)
-            
-            # version blocking ui
-            '''
-            layerHandle.startEditing()
-            pv = layerHandle.dataProvider()
-            pv.addAttributes([QgsField('Volume', QVariant.Double)])
-            layerHandle.updateFields()
-            
-            calculatorExpression = QgsExpression('"zone" * "m2"')
-            
-            calculatorContext = QgsExpressionContext()
-            calculatorContext.appendScopes(QgsExpressionContextUtils.globalProjectLayerScopes(layerHandle))
-            
-            for f in layerHandle.getFeatures():
-                calculatorContext.setFeature(f)
-                f['Volume'] = calculatorExpression.evaluate(calculatorContext)
-                layerHandle.updateFeature(f)
-            
-            layerHandle.commitChanges()
-            #end blocking ui
-            '''
 
     def run(self):
         """Run method that performs all the real work"""
@@ -394,9 +373,8 @@ class EditGpkgTask(QgsTask):
         return True
 
     def finished(self, result):
-        QgsMessageLog.logMessage('In finished(), emit signal')
         if result:
-            QgsMessageLog.logMessage('In with no error')
+            QgsMessageLog.logMessage('Finished editing gpkg with no error')
             self.iface.addVectorLayer(self.gpkg, 'zonalStats' + self.datestring, "ogr")
             self.iface.messageBar().createMessage("Info", "Finished calculating volume difference")
             self.importComplete.emit()

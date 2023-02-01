@@ -10,10 +10,10 @@ version=0.1
 author=L Yang/Bligh Tanner
 email=lauren.yang@blightanner.com.au
 
-about=Calculates the volume difference between two raster layers. If the layers are different sizes, the larger will be clipped to the smaller. Units of the raster/DEM must match project units (eg, m, m^2, m^3).
+about=Calculates the volume difference between two raster layers with elevation data. If the layers are different sizes, the larger will be clipped to the smaller. Units of the raster/DEM must match project units (eg, m, m^2, m^3).  To view the volume difference between raster surfaces, open the statistical summary pane (View->Statistical Summary), select the generated statistical summary layer (zonalStats<*>) and select the "Volume" field.  The difference in volume is the calculated "Sum" statistic.  A negative number implies erosion/loss, a positive number implies accretion/gain. 
 
-tracker=http://bugs
-repository=http://repo
+tracker=https://github.com/blightanner/DEMDifferenceQgisPlugin/issues
+repository=https://github.com/blightanner/DEMDifferenceQgisPlugin
 # End of mandatory metadata
 
 # Recommended items:
@@ -40,7 +40,7 @@ deprecated=False
 # plugin_dependencies=
 
 Category of the plugin: Raster, Vector, Database or Web
-# category=
+# category=Raster
 
 # If the plugin can run on QGIS Server.
 server=False

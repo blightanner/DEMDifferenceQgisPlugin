@@ -6,7 +6,7 @@
 name=Raster Volume Comparison
 qgisMinimumVersion=3.0
 description=Calculates the difference in volume between two raster layers
-version=0.1
+version=0.2
 author=Lauren Yang at Bligh Tanner Pty Ltd
 email=lauren.yang@blightanner.com.au
 

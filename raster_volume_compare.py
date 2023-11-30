@@ -203,7 +203,7 @@ class RasterVolumeCompare:
         self.dlg.lineEdit.setText(filename)  
         
     def select_style_file(self):  
-        filename, _filter = QFileDialog.getSaveFileName(  
+        filename, _filter = QFileDialog.getOpenFileName(  
             self.dlg, "Select output filename and destination","layer_info", 'QML(*.qml)')  
         self.dlg.lineEdit_2.setText(filename) 
     

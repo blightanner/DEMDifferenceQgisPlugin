@@ -298,7 +298,7 @@ class RasterVolumeCompare:
             todayDateString = datetime.today().strftime('%Y-%m-%d')
             rLayerDifference = iface.addRasterLayer(newFilename, "DifferenceRaster" + todayDateString)
 
-            currentDir = os.getcwd()
+            currentDir = QgsProject.instance().homePath()
             QgsMessageLog.logMessage('Current working directy is ' + currentDir, 'my-plugin', Qgis.Info)
             
             userSpecifiedStylePath = self.dlg.lineEdit_2.text()
@@ -321,13 +321,14 @@ class RasterVolumeCompare:
             if os.path.isdir(statsFolder):
                 statsFilePath = currentDir + '\\5 Working Files\\zonalStats' + todayDateString + '.gpkg'
             else:
-                statsFilePath = todayDateString + '.gpkg'
+                statsFilePath = currentDir + '\\' + todayDateString + '.gpkg'
             
             # task stuff
             alg = QgsApplication.processingRegistry().algorithmById(
                                       'native:rasterlayerzonalstats')
             
             params = {'INPUT': rLayerDifference.source(), 'BAND': 1, 'ZONES_BAND': 1, 'ZONES': rLayerDifference.source(),'OUTPUT_TABLE': statsFilePath}
+            
             task = QgsProcessingAlgRunnerTask(alg, params, self.context, self.feedback)
             task.executed.connect(partial(self.OnZonalStatsComplete, self.context))
             QgsApplication.taskManager().addTask(task)
@@ -353,22 +354,25 @@ class EditGpkgTask(QgsTask):
             QgsMessageLog.logMessage('Unable to load gpkg statistics file', 'my-plugin', Qgis.Info)
             return False
         
-        statsLayer.startEditing()
         pv = statsLayer.dataProvider()
         pv.addAttributes([QgsField('Volume', QVariant.Double)])
         statsLayer.updateFields()
-        
-        calculatorExpression = QgsExpression('"zone" * "m2"')
-        
-        calculatorContext = QgsExpressionContext()
-        calculatorContext.appendScopes(QgsExpressionContextUtils.globalProjectLayerScopes(statsLayer))
-        
+        idVolumeAttr = pv.fieldNameIndex('Volume')
+        idZoneAttr = pv.fieldNameIndex('zone')
+        idm2Attr = pv.fieldNameIndex('m2')
+        updateMap = {}
         for f in statsLayer.getFeatures():
-            calculatorContext.setFeature(f)
-            f['Volume'] = calculatorExpression.evaluate(calculatorContext)
-            statsLayer.updateFeature(f)
+            zone = float(f["zone"])
+            m2 = float(f["m2"])
+            vol = zone * m2
+            
+            attrVol = {idVolumeAttr : float(vol)}
+            updateMap[f.id()] = attrVol
+            
+            if f.id() % 1000 == 0:
+                QgsMessageLog.logMessage('Updating feature with volume {0}'.format(vol), 'my-plugin', Qgis.Info)
         
-        statsLayer.commitChanges()
+        pv.changeAttributeValues( updateMap )
 
         return True
 
